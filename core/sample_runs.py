@@ -1,24 +1,139 @@
-import sys
-from operator import itemgetter
+"""
+Module provides examples of more extensive library usage (see the __main__ method for usage).
+
+This includes:
+ - Running a simple optimisation
+ - Averaging multiple optimisation results
+ - Graphing multiple Algorithm's performance on chosen problems
+ - Graphing heat-maps to show algorithm performance over a range of parameter combinations
+"""
 
 import numpy as np
-from algorithms import algo_ea, algo_hc, algo_rs, algo_saea0, algo_saea2, algo_es_mu_lambda, algo_es_mu_lambda, \
-    algo_saes, algo_saes2
+from algorithms import algo_ea, algo_hc, algo_rs, algo_es_mu_lambda, algo_es_mu_lambda, algo_saes
 from algorithms import algo_saea
 from generators import gen_gp, gen_onemax, gen_rastrigin, gen_schwefel, gen_sphere
 from core import solver, ops, graphing
 
-test1_params = solver.AlgoParams(select=ops.select_tournament,
-                                 crossover=ops.crossover_one_point,
-                                 mutate=ops.mutate_trace_gauss,
-                                 generations=500,
-                                 pop_size=30,
-                                 mutation_rate=0.1,
-                                 minimising=True,
-                                 verbose=-1)
+
+def graph_multiple_algos_performance(algos, gen, num_runs):
+    """
+    Plot performance comparison graphs for a range of algorithms optimising a
+    particular problem generator. Prints out results.
+    Specific parameters are obtained from systematic tuning process of mutation
+    rate and mutation sd that was undertaken using the t_parameter_tuning method.
+
+    :param algos:           List of algorithms
+    :param gen:             Generator
+    :param num_runs:        Number of runs
+    :return:
+    """
+    aps = solver.AlgoParams(generations=500,
+                            pop_size=30,
+                            num_children=25,
+                            crossover_rate=0.2,
+                            mutation_rate=0.15)
+    title = 'Algorithm Progress Comparison for '
+    log = True
+    legend_loc = 'lower left'
+    algo_hc.more_gens = False
+    algo_ea.elitist = False
+    av_type = 'mean'
+    specific_params = None
+
+    # Specific parameter setup:
+    if gen == gen_schwefel:
+        specific_params = [{"mutation_rate": 0.10, "mutation_sd": 0.35},
+                           {"mutation_rate": 0.15, "mutation_sd": 1.00},
+                           {"mutation_rate": 1.00, "mutation_sd": 0.50},
+                           {"mutation_rate": 0.75, "mutation_sd": 0.25},
+                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
+        aps.mutation_rate = 0.1
+        aps.mutation_sd = 0.35
+        aps.minimising = True
+        title += 'Schwefel\'s Problem'
+        log = True
+        legend_loc = 'lower left'
+        av_type = 'median'
+    if gen == gen_rastrigin:
+        specific_params = [{"mutation_rate": 0.05, "mutation_sd": 0.15},
+                           {"mutation_rate": 0.30, "mutation_sd": 1.00},
+                           {"mutation_rate": 1.00, "mutation_sd": 0.50},
+                           {"mutation_rate": 0.10, "mutation_sd": 0.10},
+                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
+        aps.mutation_rate = 0.05
+        aps.mutation_sd = 0.15
+        aps.minimising = True
+        title += 'Rastrigin\'s Problem'
+        log = True
+        legend_loc = 'lower left'
+        av_type = 'mean_with_offset'
+    if gen == gen_gp:
+        specific_params = [{"mutation_rate": 0.15, "mutation_sd": 0.30},
+                           {"mutation_rate": 0.30, "mutation_sd": 1.00},
+                           {"mutation_rate": 1.00, "mutation_sd": 0.15},
+                           {"mutation_rate": 0.10, "mutation_sd": 0.10},
+                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
+        aps.mutation_rate = 0.15
+        aps.mutation_sd = 0.3
+        aps.minimising = True
+        title += 'the GP Problem'
+        log = True
+        legend_loc = 'upper right'
+        av_type = 'mean'
+    if gen == gen_sphere:
+        specific_params = [{"mutation_rate": 0.05, "mutation_sd": 0.05},
+                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
+                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
+                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
+                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
+        aps.mutation_rate = 0.05
+        aps.mutation_sd = 0.05
+        aps.minimising = False
+        title += 'the Sphere Problem'
+        log = False
+        legend_loc = 'lower right'
+        algo_hc.more_gens = True
+        algo_ea.elitist = False
+        av_type = 'mean_with_offset'
+    if gen == gen_onemax:
+        specific_params = [{"mutation_rate": 0.05, "mutation_sd": 0.05},
+                           {"mutation_rate": 0.05, "mutation_sd": 1.00},
+                           {"mutation_rate": 1.00, "mutation_sd": 0.05},
+                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
+                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
+        aps.mutation_rate = 0.05
+        aps.mutation_sd = 0.05
+        aps.minimising = False
+        title += 'the OneMax Problem'
+        log = False
+        legend_loc = 'lower right'
+        algo_hc.more_gens = True
+        algo_ea.elitist = False
+        av_type = 'mean_with_offset'
+
+    print(title)
+    print()
+    print(aps)
+    print('log:', log)
+    print('elitest:', algo_ea.elitist)
+
+    run_with_stats2(gen, algos, aps, num_runs, log=log, ind_params=specific_params, av_type=av_type,
+                    title=title, legend_loc=legend_loc)
 
 
 def run_n_times(gen, alg, aps, n, print_ind=False, print_alg=False):
+    """
+    Average the results from multiple optimisation runs of the same
+    algorithm/problem generator combination
+
+    :param gen:                 Problem generator
+    :param alg:                 Optimisation algorithm
+    :param aps:                 Algorithm parameters
+    :param n:                   Number of optimisations to average over
+    :param print_ind:           Print each individual result
+    :param print_alg:           Print Algorithm name
+    :return:                    Average optimisation fitness result
+    """
     if print_alg:
         print('\n', alg.__name__)
     res = []
@@ -35,12 +150,28 @@ def run_n_times(gen, alg, aps, n, print_ind=False, print_alg=False):
 
 
 def compare_algs(gen, algos, aps, n, print_ind=False):
+    """ Calls run_n_times for a number of different algorithms """
     for a in algos:
         run_n_times(gen, a, aps, n, print_ind)
 
 
 def run_with_stats(gen, algos, aps, n_runs, log=True, title='Alg. Performance comparison', path='alg_progress/',
                    legend_loc='upper left'):
+    """
+    Outputs a graph showing the generational best of each algorithm's solutions
+    over a number of generations. This involves accessing the statistics of the
+    algorithm throughout the optimisation process
+
+    :param gen:                 Problem generator
+    :param algos:               List of algorithms
+    :param aps:                 Algorithm parameters
+    :param n_runs:              Number of runs
+    :param log:                 Use a log scale for the (graphed) fitness value
+    :param title:               Graph title
+    :param path:                Path to output graph image to
+    :param legend_loc:          Legend location
+    :return:
+    """
     print('\n', gen.__name__)
     bests_dict = {}
     for alg in algos:
@@ -85,14 +216,17 @@ def run_with_stats(gen, algos, aps, n_runs, log=True, title='Alg. Performance co
     graphing.graph_genbest_vs_generations_many_algs(bests_dict, log=log, title=title, legend_loc=legend_loc)
 
 
-def run_with_stats2(gen, algos, aps, n_runs, log=True, ind_params=None, av_type='mean',
+def run_with_stats2(gen, algos, aps, n_runs, log=True, ind_params=None, av_type='mean_with_offset',
                     title='Alg. Performance comparison', path='alg_progress/', legend_loc='upper left'):
+    """
+    Similar to run_with_stats(), except different average types can be used
+    (mean_with_offset, mean, median).
+    Mean with offset particularly useful, as anomalies can skew performance results
+    if just the mean is used
+    """
     # Only graphs mean bests:
     print('\n', gen.__name__)
     bests_dict = {}
-
-    # Average option: median, mean, mean_with_offset
-    av_type = 'mean_with_offset'
 
     # Remove anomalies (from both best and worst)
     c_offset = 2  # Offset from centre
@@ -159,40 +293,8 @@ def run_with_stats2(gen, algos, aps, n_runs, log=True, ind_params=None, av_type=
     graphing.graph_genbest_vs_generations_many_algs(bests_dict, log=log, title=title, legend_loc=legend_loc)
 
 
-def run_with_stats_same_graph(gens, algos, aps, n_runs, path='results/'):
-    for gen in gens:
-        print('\n', gen.__name__)
-        bests_dict = {}
-        for alg in algos:
-            print('\n', alg.__name__)
-
-            n = 0
-            means = None
-            for run in range(n_runs):
-                n += 1
-                s = solver.Solver(gen, alg, aps)
-                sol = s.solve()
-
-                # Get generational statistics:
-                n_means = s.stats.get_stats()
-                n_means = tuple(i for i in n_means if len(i) > 0)
-                if means is None:
-                    means = [[0] * aps.generations] * len(n_means)
-
-                # Add statistics to an iterative mean:
-                for b in range(len(n_means)):
-                    for stat_type in range(len(n_means)):
-                        means[stat_type][b] += (n_means[stat_type][b] - means[stat_type][b]) / n
-
-            mean_bests = n_means[0]
-            print(mean_bests)
-            print('Av Best:', mean_bests[-1])
-            # fig_title = 'Problem-' + gen.__name__[15:] + ', Algorithm-' + alg.__name__[16:] + ' (' + str(
-            #     aps.generations) + ' generations)'
-            # graphing.graph_genav_genbest_best_vs_generations(mean_bests, title=fig_title, path=path)
-
-
 def t_run_graphs():
+    """ Call run_with_stats() [graphs performance comparisons] for a range of algorithms """
     alg_params = solver.AlgoParams(generations=500,
                                    pop_size=30,
                                    num_children=20,
@@ -205,6 +307,10 @@ def t_run_graphs():
 
 
 def t_run_av_scores():
+    """
+    Call compare_algs() [prints average fitness results for range of algorithms] for
+    multiple generators
+    """
     alg_params = solver.AlgoParams(generations=500,
                                    pop_size=30,
                                    num_children=20,
@@ -222,7 +328,10 @@ def t_run_av_scores():
 
 
 def t_parameter_tuning():
-    # Done with 25 samples. Remember min=False for sphere
+    """
+    Plot heatmap showing the effects of different combinations of mutation rate and mutation
+    strength on an algorithm's performance
+    """
     num_runs = 25
     alg_params = solver.AlgoParams(generations=500,
                                    pop_size=20,
@@ -234,6 +343,7 @@ def t_parameter_tuning():
     algs = [algo_hc]
     gens = [gen_schwefel]
 
+    # Range of mutation rates/strengths -- focused on lower values
     m_rates = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.75, 1]
     m_sds = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.75, 1]
     for gen in gens:
@@ -346,109 +456,12 @@ def build_parameter_matrix(p1, p2, gen, alg, aps, n):
     return all_sols
 
 
-def graph_multiple_algos_performance(algos, gen, num_runs):
-    """
-    Plot performance graphs for a particular problem generator. Prints out results.
-
-    :param algos:           List of algorithms
-    :param gen:             Generator
-    :param num_runs:        Number of runs
-    :return:
-    """
-    aps = solver.AlgoParams(generations=500,
-                            pop_size=30,
-                            num_children=25,
-                            crossover_rate=0.2,
-                            mutation_rate=0.15)
-    title = 'Algorithm Progress Comparison for '
-    log = True
-    legend_loc = 'lower left'
-    algo_hc.more_gens = False
-    algo_ea.elitist = False
-    av_type = 'mean'
-    specific_params = None
-
-    if gen == gen_schwefel:
-        specific_params = [{"mutation_rate": 0.10, "mutation_sd": 0.35},
-                           {"mutation_rate": 0.15, "mutation_sd": 1.00},
-                           {"mutation_rate": 1.00, "mutation_sd": 0.50},
-                           {"mutation_rate": 0.75, "mutation_sd": 0.25},
-                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
-        aps.mutation_rate = 0.1
-        aps.mutation_sd = 0.35
-        aps.minimising = True
-        title += 'Schwefel\'s Problem'
-        log = True
-        legend_loc = 'lower left'
-        av_type = 'median'
-    if gen == gen_rastrigin:
-        specific_params = [{"mutation_rate": 0.05, "mutation_sd": 0.15},
-                           {"mutation_rate": 0.30, "mutation_sd": 1.00},
-                           {"mutation_rate": 1.00, "mutation_sd": 0.50},
-                           {"mutation_rate": 0.10, "mutation_sd": 0.10},
-                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
-        aps.mutation_rate = 0.05
-        aps.mutation_sd = 0.15
-        aps.minimising = True
-        title += 'Rastrigin\'s Problem'
-        log = True
-        legend_loc = 'lower left'
-        av_type = 'mean_with_offset'
-    if gen == gen_gp:
-        specific_params = [{"mutation_rate": 0.15, "mutation_sd": 0.30},
-                           {"mutation_rate": 0.30, "mutation_sd": 1.00},
-                           {"mutation_rate": 1.00, "mutation_sd": 0.15},
-                           {"mutation_rate": 0.10, "mutation_sd": 0.10},
-                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
-        aps.mutation_rate = 0.15
-        aps.mutation_sd = 0.3
-        aps.minimising = True
-        title += 'the GP Problem'
-        log = True
-        legend_loc = 'upper right'
-        av_type = 'mean'
-    if gen == gen_sphere:
-        specific_params = [{"mutation_rate": 0.05, "mutation_sd": 0.05},
-                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
-                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
-                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
-                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
-        aps.mutation_rate = 0.05
-        aps.mutation_sd = 0.05
-        aps.minimising = False
-        title += 'the Sphere Problem'
-        log = False
-        legend_loc = 'lower right'
-        algo_hc.more_gens = True
-        algo_ea.elitist = False
-        av_type = 'mean_with_offset'
-    if gen == gen_onemax:
-        specific_params = [{"mutation_rate": 0.05, "mutation_sd": 0.05},
-                           {"mutation_rate": 0.05, "mutation_sd": 1.00},
-                           {"mutation_rate": 1.00, "mutation_sd": 0.05},
-                           {"mutation_rate": 0.05, "mutation_sd": 0.05},
-                           {"mutation_rate": 1.00, "mutation_sd": 1.00}]
-        aps.mutation_rate = 0.05
-        aps.mutation_sd = 0.05
-        aps.minimising = False
-        title += 'the OneMax Problem'
-        log = False
-        legend_loc = 'lower right'
-        algo_hc.more_gens = True
-        algo_ea.elitist = False
-        av_type = 'mean_with_offset'
-
-    print(title)
-    print()
-    print(aps)
-    print('log:', log)
-    print('elitest:', algo_ea.elitist)
-
-    run_with_stats2(gen, algos, aps, num_runs, log=log, ind_params=specific_params, av_type=av_type,
-                    title=title, legend_loc=legend_loc)
-
-
 if __name__ == '__main__':
+    # -- Graph multiple Algorithm's performance on a specific problem generator --
+    algos = [algo_ea, algo_saes, algo_saea, algo_hc, algo_rs]
+    gen = gen_schwefel
+    graph_multiple_algos_performance(algos, gen, 50)
+
     # -- Specify Algorithm Parameters --
     # aps = solver.AlgoParams(generations=500,
     #                         pop_size=20,
@@ -458,7 +471,6 @@ if __name__ == '__main__':
     #                         crossover_rate=0.2,
     #                         minimising=True)
     # run_with_stats([gen_schwefel, gen_rastrigin], [algo_saea3], aps, 60)
-    # run_with_stats_same_graph([gen_schwefel, gen_rastrigin], [algo_saea3], aps, 60)
 
     # -- Run simple optimisation --
     # s = solver.Solver(gen_schwefel, algo_saea, aps).solve()
@@ -480,8 +492,3 @@ if __name__ == '__main__':
     # gen = gen_rastrigin
     # algos = [algo_ea, algo_saes, algo_saea]
     # run_with_stats(gen, algos, aps, 20)
-
-    # -- Graph multiple Algorithm's performance --
-    algos = [algo_ea, algo_saes, algo_saea, algo_hc, algo_rs]
-    gen = gen_schwefel
-    graph_multiple_algos_performance(algos, gen, 50)
