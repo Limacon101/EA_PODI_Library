@@ -1,6 +1,5 @@
 # PODI Library
-Library allows for the optimisation of multiple problems (called problem generators) using a selection of evolutionary algorithms.
-
+An Evolutionary Algorithm library utilising a Program Optimisation with Dependency Injection approach. This allows for problems to be independently specified from the algorithms used to optimise them. The library can compare the performance of a range of different algorithms (standard EA, self-adaptive EA, self-adaptive evolutionary strategy, hill-climber, random search) on a variety of problems (OneMax, Sphere, Schwefel's, Rastrigin's, Symbolic regression). The library is designed to be able to be easily extended to include new problems, algorithms and operators.
 
 ### Prerequisites
 Python packages:
